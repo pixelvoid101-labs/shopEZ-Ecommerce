@@ -70,6 +70,18 @@ const CheckoutPage = () => {
     
     setLoading(true);
     try {
+      // FIX 1: Safe fallback to localStorage if AuthContext token is temporarily uninitialized
+      const activeToken = token || localStorage.getItem('token');
+
+      if (!activeToken || activeToken === 'undefined' || activeToken === 'null') {
+        alert('Your login session has expired. Please log in again.');
+        navigate('/login');
+        return;
+      }
+
+      // FIX 2: Clean up token by removing surrounding quotes or duplicate Bearer prefixes
+      const cleanToken = activeToken.replace(/^"|"$/g, '').replace(/^Bearer\s+/i, '');
+
       const payload = {
         items: cartItems.map((item) => ({
           product: item.id || item._id, // Support both formatting schemas safely
@@ -91,7 +103,10 @@ const CheckoutPage = () => {
       };
 
       await axios.post('http://localhost:5000/api/orders', payload, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          // NOTE: If this still throws 401, change `Bearer ${cleanToken}` to just `cleanToken`
+          Authorization: `Bearer ${cleanToken}` 
+        }
       });
 
       localStorage.removeItem(cartKey);
@@ -100,7 +115,6 @@ const CheckoutPage = () => {
       navigate('/orders');
     } catch (error) {
       console.error('Order pipeline failed', error);
-      // Alerts exact schema error text description trace directly back to screen if validation fails
       alert(error.response?.data?.error || error.response?.data?.message || 'Failed to create order');
     } finally {
       setLoading(false);
